@@ -1,5 +1,8 @@
 import axios from 'axios';
 
-export default axios.create({
-  baseURL: 'http://localhost:3000/api' // Must have /api at the end
+const api = axios.create({
+  // Make sure this matches the URL from your Render "Events" tab!
+  baseURL: 'https://lab6-backend-wxzv.onrender.com' 
 });
+
+export default api;
