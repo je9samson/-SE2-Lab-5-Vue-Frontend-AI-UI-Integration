@@ -1,6 +1,5 @@
 <template>
   <div class="full-page-wrapper">
-    
     <transition name="fade">
       <div v-if="loading" class="loading-overlay">
         <div class="spinner-container">
@@ -11,7 +10,6 @@
     </transition>
 
     <main class="pc-dashboard">
-      
       <aside class="sidebar">
         <div class="sidebar-inner">
           <div class="logo">
@@ -75,8 +73,6 @@
 </template>
 
 <script>
-import api from '../services/api';
-
 export default {
   data() {
     return {
@@ -84,43 +80,80 @@ export default {
       mood: '',
       aiMessage: '',
       errorMessage: '',
-      loading: false, // Eto ang nag-to-toggle ng spinner
+      loading: false,
       history: []
     };
   },
   methods: {
     async fetchHistory() {
       try {
-        const res = await api.get('/moods');
-        this.history = res.data;
+        // Updated to localhost to fix CORS
+        const response = await fetch('http://localhost:10000/moods');
+        if (response.ok) {
+          this.history = await response.json();
+        }
       } catch (err) {
         this.errorMessage = "Could not refresh history.";
+        console.error("History fetch failed:", err);
       }
     },
-    async submitMood() {
-      if (!this.name || !this.mood) return alert("Fill out both fields!");
-      
-      this.loading = true; // START LOADING: Lalabas ang spinner
-      this.errorMessage = '';
-      this.aiMessage = '';
 
-      try {
-        const res = await api.post('/moods', {
-          full_name: this.name,
-          mood_text: this.mood
-        });
-        
-        // Kapag nandito na ang data, tapos na ang loading
-        this.aiMessage = res.data.aiMessage;
-        this.mood = ''; 
-        await this.fetchHistory();
-      } catch (err) {
-        this.errorMessage = "Connection error. Please try again.";
-      } finally {
-        this.loading = false; // STOP LOADING: Mawawala ang spinner
-      }
-    },
+async submitMood() {
+  // --- PART 0.1 LOGGING START ---
+  console.log("User clicked submit button"); // Logs the event
+  console.log("Mood value entered:", this.mood); // Logs the input data
+  // --- PART 0.1 LOGGING END ---
+
+  if (!this.name || !this.mood) return alert("Fill out both fields!");
+  
+  this.loading = true; 
+  const lowerMood = this.mood.toLowerCase();
+  let dynamicResponse = "";
+
+  // (The randomized logic stays here...)
+  const responses = {
+    sad: ["I'm sorry you're feeling down...", "It's okay to feel sad...", "Sending a virtual hug..."],
+    anxious: ["Take a deep breath...", "Focus on 3 things...", "This will pass..."],
+    happy: ["That's amazing!", "I love hearing that!", "Positive vibes only!"],
+    default: ["Thank you for sharing...", "Checking in is the first step..."]
+  };
+  const pickRandom = (list) => list[Math.floor(Math.random() * list.length)];
+
+  if (lowerMood.includes("sad")) { dynamicResponse = pickRandom(responses.sad); }
+  else if (lowerMood.includes("anxious")) { dynamicResponse = pickRandom(responses.anxious); }
+  else if (lowerMood.includes("happy")) { dynamicResponse = pickRandom(responses.happy); }
+  else { dynamicResponse = pickRandom(responses.default); }
+
+  try {
+    const response = await fetch("http://localhost:10000/moods", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ 
+        full_name: this.name, 
+        mood_text: this.mood,
+        ai_message: dynamicResponse 
+      })
+    });
+
+    // --- PART 0.1 LOGGING START ---
+    console.log("API response status:", response.status); // Logs the server response
+    // --- PART 0.1 LOGGING END ---
+
+    if (response.ok) {
+      this.aiMessage = dynamicResponse;
+      this.mood = ''; 
+      await this.fetchHistory();
+    }
+  } catch (err) {
+    this.errorMessage = "Connection error.";
+    console.error("Submission failed:", err);
+  } finally {
+    this.loading = false; 
+  }
+},
+
     formatDate(d) {
+      if (!d) return "Just now";
       return new Date(d).toLocaleString([], { 
         month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
       });
@@ -133,117 +166,70 @@ export default {
 </script>
 
 <style scoped>
-/* --- SPINNER OVERLAY STYLES --- */
+/* SPINNER & OVERLAY */
 .loading-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(255, 255, 255, 0.85); /* Semi-transparent white */
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 999;
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(255, 255, 255, 0.9); display: flex;
+  justify-content: center; align-items: center; z-index: 999;
 }
-
-.spinner-container {
-  text-align: center;
-}
-
 .spinner {
-  width: 60px;
-  height: 60px;
-  border: 6px solid #f3f3f3;
-  border-top: 6px solid #000; /* Black spinner head */
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0 auto 15px;
+  width: 50px; height: 50px; border: 5px solid #f3f3f3;
+  border-top: 5px solid #10b981; border-radius: 50%;
+  animation: spin 1s linear infinite; margin: 0 auto 10px;
 }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* --- DASHBOARD LAYOUT --- */
+/* DASHBOARD LAYOUT */
 .full-page-wrapper {
   position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-  background: #f8fafc; overflow: hidden; color: #000 !important;
+  background: #f8fafc; overflow: hidden;
 }
-
 .pc-dashboard { display: grid; grid-template-columns: 380px 1fr; width: 100%; height: 100%; }
 
+/* SIDEBAR */
 .sidebar {
-  background: white; border-right: 2px solid #000;
-  padding: 40px 30px; box-sizing: border-box; text-align: left;
+  background: #ffffff; border-right: 2px solid #e2e8f0;
+  padding: 40px 30px; text-align: left;
 }
+.logo h2 { margin-bottom: 30px; font-weight: 800; color: #1e293b !important; }
+.logo span { color: #10b981 !important; }
 
-.logo h2 { margin-bottom: 30px; font-weight: 900; }
-.logo span { color: #10b981; }
-
+/* FORMS */
 .form-group { margin-bottom: 20px; }
-label { display: block; font-weight: bold; margin-bottom: 5px; }
-
+label { display: block; font-weight: 700; margin-bottom: 8px; color: #475569 !important; }
 input, textarea {
-  width: 100%; padding: 12px; border: 2px solid #000; border-radius: 8px; color: #000;
+  width: 100%; padding: 12px; border: 1.5px solid #cbd5e1; border-radius: 8px;
+  background: #fff; color: #1e293b !important;
 }
-textarea { height: 120px; resize: none; }
-
 .submit-button {
-  width: 100%; padding: 15px; background: #000; color: #fff !important;
-  border: none; border-radius: 8px; font-weight: bold; cursor: pointer;
+  width: 100%; padding: 14px; background: #1e293b; color: #fff !important;
+  border: none; border-radius: 8px; font-weight: 600; cursor: pointer;
 }
 
-.submit-button:disabled { background: #555; cursor: not-allowed; }
-
-.ai-box {
-  margin-top: 25px; padding: 20px; border: 2px solid #000;
-  background: #f0fdf4; border-radius: 8px;
-}
-
-/* --- HISTORY AREA --- */
-.history-feed { padding: 40px; display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; }
-
-.feed-header {
+/* HISTORY FEED */
+.history-feed { padding: 40px; background: #f8fafc; overflow-y: auto; text-align: left; }
+.feed-header { 
   display: flex; justify-content: space-between; align-items: center;
-  border-bottom: 3px solid #000; padding-bottom: 15px; margin-bottom: 20px;
+  border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; margin-bottom: 25px;
 }
-
-.history-scroll-container {
-  overflow-y: auto; flex-grow: 1; padding-right: 15px; text-align: left;
-}
-
 .history-row {
-  display: grid; grid-template-columns: 200px 1fr;
-  background: white; border: 2px solid #000; border-radius: 12px;
-  padding: 20px; margin-bottom: 20px;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+  padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  display: grid; grid-template-columns: 180px 1fr;
 }
-
-.user-profile { display: flex; align-items: start; gap: 12px; }
-.user-meta { display: flex; flex-direction: column; gap: 2px; }
-.user-name { font-weight: 900; font-size: 1rem; }
-.timestamp { font-size: 0.75rem; opacity: 0.7; }
-
 .avatar {
-  width: 35px; height: 35px; background: #000; color: #fff !important;
+  width: 32px; height: 32px; background: #10b981; color: #fff !important;
   border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;
 }
-
-.user-mood { font-size: 1.1rem; font-style: italic; margin-bottom: 10px; }
-.ai-reply {
-  padding: 12px; border: 1px dashed #000; background: #f8fafc; border-radius: 6px;
+.user-name { font-weight: 700; color: #1e293b !important; }
+.ai-reply { 
+  margin-top: 10px; padding: 12px; background: #f0fdf4; 
+  border-radius: 8px; font-size: 0.9rem; color: #166534 !important;
 }
 
-/* Global Transitions */
-.fade-enter-active, .fade-leave-active { transition: opacity 0.5s; }
-.fade-enter, .fade-leave-to { opacity: 0; }
-
-/* Force Black Text */
-* { color: #000 !important; }
-.submit-button, .avatar, .spinner { color: #fff !important; }
-
-/* Custom Scrollbar */
-::-webkit-scrollbar { width: 10px; }
-::-webkit-scrollbar-thumb { background: #000; border-radius: 10px; }
+/* TEXT COLOR OVERRIDE (Safety) */
+h2, p, span, label, input, textarea, small {
+  color: #1e293b !important;
+}
+.error-box { color: #dc2626 !important; font-weight: bold; margin-bottom: 15px; }
 </style>
